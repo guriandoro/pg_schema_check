@@ -152,10 +152,12 @@ func fetchTableInfo(ctx context.Context, conn *pgx.Conn, tableName string) (Tabl
 		var col ColumnInfo
 		var nullable string
 		var defaultVal sql.NullString
-		if err := rows.Scan(&col.Name, &col.Type, &nullable, &defaultVal, &col.IsIdentity); err != nil {
+		var identity string
+		if err := rows.Scan(&col.Name, &col.Type, &nullable, &defaultVal, &identity); err != nil {
 			return tableInfo, fmt.Errorf("error scanning column: %w", err)
 		}
 		col.Nullable = nullable == "YES"
+		col.IsIdentity = identity == "YES"
 		if defaultVal.Valid {
 			col.Default = defaultVal.String
 		} else {
