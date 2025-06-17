@@ -85,13 +85,23 @@ func FetchSchema(ctx context.Context, conn *pgx.Conn) (*Schema, error) {
 	}
 	defer rows.Close()
 
-	// Process each table and fetch its complete information
+	// Collect all table names first
+	var tableNames []string
 	for rows.Next() {
 		var tableName string
 		if err := rows.Scan(&tableName); err != nil {
 			return nil, fmt.Errorf("error scanning table name: %w", err)
 		}
+		tableNames = append(tableNames, tableName)
+	}
 
+	// Check for any errors that occurred during iteration
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating table names: %w", err)
+	}
+
+	// Now that the initial query is complete, fetch detailed info for each table
+	for _, tableName := range tableNames {
 		tableInfo, err := fetchTableInfo(ctx, conn, tableName)
 		if err != nil {
 			return nil, fmt.Errorf("error fetching table info for %s: %w", tableName, err)
