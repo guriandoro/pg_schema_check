@@ -147,8 +147,13 @@ func fetchTableInfo(ctx context.Context, conn *pgx.Conn, tableName string) (Tabl
 		tableInfo.Columns = append(tableInfo.Columns, col)
 	}
 
+	// Check for any errors that occurred during iteration
+	if err := rows.Err(); err != nil {
+		return tableInfo, fmt.Errorf("error iterating columns: %w", err)
+	}
+
 	// Fetch primary key information
-	rows, err = conn.Query(ctx, `
+	pkRows, err := conn.Query(ctx, `
 		SELECT kcu.column_name
 		FROM information_schema.table_constraints tc
 		JOIN information_schema.key_column_usage kcu
@@ -161,19 +166,24 @@ func fetchTableInfo(ctx context.Context, conn *pgx.Conn, tableName string) (Tabl
 	if err != nil {
 		return tableInfo, fmt.Errorf("error fetching primary keys: %w", err)
 	}
-	defer rows.Close()
+	defer pkRows.Close()
 
 	// Process each primary key column
-	for rows.Next() {
+	for pkRows.Next() {
 		var colName string
-		if err := rows.Scan(&colName); err != nil {
+		if err := pkRows.Scan(&colName); err != nil {
 			return tableInfo, fmt.Errorf("error scanning primary key: %w", err)
 		}
 		tableInfo.PrimaryKeys = append(tableInfo.PrimaryKeys, colName)
 	}
 
+	// Check for any errors that occurred during iteration
+	if err := pkRows.Err(); err != nil {
+		return tableInfo, fmt.Errorf("error iterating primary keys: %w", err)
+	}
+
 	// Fetch index information including index names, columns, and uniqueness
-	rows, err = conn.Query(ctx, `
+	indexRows, err := conn.Query(ctx, `
 		SELECT
 			i.relname as index_name,
 			array_agg(a.attname) as column_names,
@@ -199,19 +209,24 @@ func fetchTableInfo(ctx context.Context, conn *pgx.Conn, tableName string) (Tabl
 	if err != nil {
 		return tableInfo, fmt.Errorf("error fetching indexes: %w", err)
 	}
-	defer rows.Close()
+	defer indexRows.Close()
 
 	// Process each index
-	for rows.Next() {
+	for indexRows.Next() {
 		var idx IndexInfo
-		if err := rows.Scan(&idx.Name, &idx.Columns, &idx.Unique); err != nil {
+		if err := indexRows.Scan(&idx.Name, &idx.Columns, &idx.Unique); err != nil {
 			return tableInfo, fmt.Errorf("error scanning index: %w", err)
 		}
 		tableInfo.Indexes = append(tableInfo.Indexes, idx)
 	}
 
+	// Check for any errors that occurred during iteration
+	if err := indexRows.Err(); err != nil {
+		return tableInfo, fmt.Errorf("error iterating indexes: %w", err)
+	}
+
 	// Fetch foreign key information including referenced tables and columns
-	rows, err = conn.Query(ctx, `
+	fkRows, err := conn.Query(ctx, `
 		SELECT
 			tc.constraint_name,
 			array_agg(kcu.column_name) as columns,
@@ -234,15 +249,20 @@ func fetchTableInfo(ctx context.Context, conn *pgx.Conn, tableName string) (Tabl
 	if err != nil {
 		return tableInfo, fmt.Errorf("error fetching foreign keys: %w", err)
 	}
-	defer rows.Close()
+	defer fkRows.Close()
 
 	// Process each foreign key constraint
-	for rows.Next() {
+	for fkRows.Next() {
 		var fk ForeignKeyInfo
-		if err := rows.Scan(&fk.Name, &fk.Columns, &fk.ReferencedTable, &fk.ReferencedColumns); err != nil {
+		if err := fkRows.Scan(&fk.Name, &fk.Columns, &fk.ReferencedTable, &fk.ReferencedColumns); err != nil {
 			return tableInfo, fmt.Errorf("error scanning foreign key: %w", err)
 		}
 		tableInfo.ForeignKeys = append(tableInfo.ForeignKeys, fk)
+	}
+
+	// Check for any errors that occurred during iteration
+	if err := fkRows.Err(); err != nil {
+		return tableInfo, fmt.Errorf("error iterating foreign keys: %w", err)
 	}
 
 	return tableInfo, nil
