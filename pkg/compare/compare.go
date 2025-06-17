@@ -4,7 +4,6 @@ package compare
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/agustin/postgres_schema_check/pkg/schema"
 )

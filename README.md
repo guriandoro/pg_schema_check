@@ -36,8 +36,7 @@ go build -o schema-check ./cmd/schema-check
 ### Connection String Format
 
 The connection string should follow the PostgreSQL connection string format:
-```
-postgresql://[user[:password]@][host][:port][/dbname][?param1=value1&...]
+```postgresql://[user[:password]@][host][:port][/dbname][?param1=value1&...]
 ```
 
 ### Example Output
@@ -51,6 +50,19 @@ Found 3 differences:
 ```
 
 ## Development
+
+### Dependency Management
+
+If you encounter errors about missing `go.sum` entries for dependencies like `github.com/jackc/pgx/v5` or `github.com/spf13/cobra`, run the following command to fetch all required dependencies and update your `go.mod` and `go.sum` files:
+
+```bash
+go mod tidy
+```
+
+This will:
+- Download any missing dependencies
+- Add the necessary entries to your `go.sum` file
+- Clean up any unused dependencies
 
 ### Project Structure
 
