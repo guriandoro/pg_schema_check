@@ -4,6 +4,7 @@ package schema
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
@@ -150,10 +151,16 @@ func fetchTableInfo(ctx context.Context, conn *pgx.Conn, tableName string) (Tabl
 	for rows.Next() {
 		var col ColumnInfo
 		var nullable string
-		if err := rows.Scan(&col.Name, &col.Type, &nullable, &col.Default, &col.IsIdentity); err != nil {
+		var defaultVal sql.NullString
+		if err := rows.Scan(&col.Name, &col.Type, &nullable, &defaultVal, &col.IsIdentity); err != nil {
 			return tableInfo, fmt.Errorf("error scanning column: %w", err)
 		}
 		col.Nullable = nullable == "YES"
+		if defaultVal.Valid {
+			col.Default = defaultVal.String
+		} else {
+			col.Default = ""
+		}
 		tableInfo.Columns = append(tableInfo.Columns, col)
 	}
 
